@@ -11,6 +11,9 @@ The current goal is to fully document the engine and make example programs/games
 Additionally, futher support for more complicated shader data is necessary (for instance: arrays of uniform structs with non-standard packing formats).
 
 Future goals:
-  Fix the installer for OSX\n
-  Change the window handling to remove the one pixel width of black space at the top of the screen\n
-  Improve full screen support\n
+
+  Fix the installer for OSX
+  
+  Change the window handling to remove the one pixel width of black space at the top of the screen
+  
+  Improve full screen support
