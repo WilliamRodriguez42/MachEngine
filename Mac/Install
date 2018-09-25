@@ -1,0 +1,29 @@
+# !/bin/bash
+
+# Check if python3 is installed
+PYTHON3_EXISTS=$(which python3)
+
+if [  "$PYTHON3_EXISTS" != "/Library/Frameworks/Python.framework/Versions/3.6/bin/python3"  ]
+then
+  echo You must install python3
+  exit 1
+else
+  echo Python3 Exists
+fi
+
+# Move to the project directory
+cd "$(dirname "$0")/../Project"
+
+# Export our commands within our Mac folder to the path
+export PATH="$PWD/../Mac:$PATH"
+
+# Install our packages if needed
+
+pip3 install PyQt5 PyOpenGL numpy simpleaudio pillow lxml
+
+# Install pyinstaller source
+
+cd ../pyinstaller-develop/
+python3 setup.py install
+
+printf "\033[0;32mYou\'re Good To Go!\033[0m\n"

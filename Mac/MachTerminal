@@ -1,0 +1,13 @@
+# !/bin/bash
+
+# Move to the project directory
+cd "$(dirname "$0")/../Project"
+
+# Export our pyenv directory to the path as well as the commands within our root folder
+export PATH="$PWD/../Mac:$PATH"
+
+export PS1="MachEngine\$ "
+
+clear
+
+bash

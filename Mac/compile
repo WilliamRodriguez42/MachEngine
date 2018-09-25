@@ -1,0 +1,17 @@
+# !/bin/bash
+
+# cd into the proper directory
+cd "$(dirname "$0")/../Project"
+
+# Remove any old compiler files
+rm -R __pycache__ build dist main.spec
+
+# Compile the program
+python3 ../pyinstaller-develop/pyinstaller.py main.py
+
+# Copy the resources if the program compiled properly
+DIRECTORY=dist/main
+if [ -d "$DIRECTORY" ]
+then
+  cp -r resources dist/main/resources
+fi

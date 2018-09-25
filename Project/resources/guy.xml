@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with TexturePacker https://www.codeandweb.com/texturepacker -->
+<!-- $TexturePacker:SmartUpdate:b8a3fdb32b78e9f80a82613ca7841ace:bcd8ba57bbe9334ea20a107f0de26ac8:12b2314ed10b1a68d02b2dcda06f60f3$ -->
+<!--Format:
+n  => name of the sprite
+x  => sprite x pos in texture
+y  => sprite y pos in texture
+w  => sprite width (may be trimmed)
+h  => sprite height (may be trimmed)
+pX => x pos of the pivot point (relative to sprite width)
+pY => y pos of the pivot point (relative to sprite height)
+oX => sprite's x-corner offset (only available if trimmed)
+oY => sprite's y-corner offset (only available if trimmed)
+oW => sprite's original width (only available if trimmed)
+oH => sprite's original height (only available if trimmed)
+r => 'y' only set if sprite is rotated
+with polygon mode enabled:
+vertices   => points in sprite coordinate system (x0,y0,x1,y1,x2,y2, ...)
+verticesUV => points in sheet coordinate system (x0,y0,x1,y1,x2,y2, ...)
+triangles  => sprite triangulation, 3 vertex indices per triangle
+-->
+<TextureAtlas imagePath="guy" width="1968" height="700">
+    <sprite n="0" x="0" y="0" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="1" x="123" y="0" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="2" x="246" y="0" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="3" x="369" y="0" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="4" x="492" y="0" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="5" x="615" y="0" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="6" x="738" y="0" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="7" x="861" y="0" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="8" x="984" y="0" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="9" x="1107" y="0" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="10" x="1230" y="0" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="11" x="1353" y="0" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="12" x="1476" y="0" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="13" x="1599" y="0" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="14" x="1722" y="0" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="15" x="1845" y="0" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="16" x="0" y="140" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="17" x="123" y="140" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="18" x="246" y="140" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="19" x="369" y="140" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="20" x="492" y="140" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="21" x="615" y="140" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="22" x="738" y="140" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="23" x="861" y="140" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="24" x="984" y="140" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="25" x="1107" y="140" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="26" x="1230" y="140" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="27" x="1353" y="140" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="28" x="1476" y="140" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="29" x="1599" y="140" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="30" x="1722" y="140" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="31" x="1845" y="140" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="32" x="0" y="280" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="33" x="123" y="280" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="34" x="246" y="280" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="35" x="369" y="280" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="36" x="492" y="280" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="37" x="615" y="280" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="38" x="738" y="280" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="39" x="861" y="280" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="40" x="984" y="280" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="41" x="1107" y="280" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="42" x="1230" y="280" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="43" x="1353" y="280" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="44" x="1476" y="280" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="45" x="1599" y="280" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="46" x="1722" y="280" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="47" x="1845" y="280" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="48" x="0" y="420" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="49" x="123" y="420" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="50" x="246" y="420" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="51" x="369" y="420" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="52" x="492" y="420" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="53" x="615" y="420" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="54" x="738" y="420" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="55" x="861" y="420" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="56" x="984" y="420" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="57" x="1107" y="420" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="58" x="1230" y="420" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="59" x="1353" y="420" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="60" x="1476" y="420" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="61" x="1599" y="420" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="62" x="1722" y="420" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="63" x="1845" y="420" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="64" x="0" y="560" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="65" x="123" y="560" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="66" x="246" y="560" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="67" x="369" y="560" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="68" x="492" y="560" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="69" x="615" y="560" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="70" x="738" y="560" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="71" x="861" y="560" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="72" x="984" y="560" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="73" x="1107" y="560" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="74" x="1230" y="560" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="75" x="1353" y="560" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="76" x="1476" y="560" w="123" h="140" pX="0.5" pY="0.5"/>
+    <sprite n="77" x="1599" y="560" w="123" h="140" pX="0.5" pY="0.5"/>
+</TextureAtlas>
