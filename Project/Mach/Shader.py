@@ -8,10 +8,11 @@ import struct
 import sys
 import glob
 
-from Mach.Attribute import Attribute
-from Mach.Struct import Struct
-from Mach.UniformBlock import UniformBlock
-from Mach.MachObject import *
+import mach
+# from Mach.Attribute import Attribute
+# from Mach.Struct import Struct
+# from Mach.UniformBlock import UniformBlock
+# from Mach.MachObject import *
 import re
 
 class Shader:
@@ -348,7 +349,7 @@ class Shader:
 
 	def createNewMachObject(self, drawType=GL_TRIANGLES):
 		" A shortcut to create a new drawable object"
-		obj = MachObject(self, drawType)
+		obj = mach.MachObject(self, drawType)
 		return obj
 
 	def bind(self, skipImages=False, skipUniforms=False, skipBlocks=False):

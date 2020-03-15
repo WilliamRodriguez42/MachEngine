@@ -1,96 +1,116 @@
-from Mach.Shader import *
-from Mach.Mach import *
-from Mach.Rendered import Texture, DepthTexture
-from Mach.Camera import Camera
-from Mach.UniformBlock import UniformBlock
-from Mach.Struct import Struct
-from Mach.Matrix import *
-from Mach.transformations import clip_matrix
-from Mach.Audio import *
-from Mach.Camera import *
-import Mach.TextureAtlas as ta
+# from Mach.Shader import *
+# from Mach.Mach import *
+import mach
+# from Mach.Rendered import Texture, DepthTexture
+# from Mach.Camera import Camera
+# from Mach.UniformBlock import UniformBlock
+# from Mach.Struct import Struct
+# from Mach.Matrix import *
+# from Mach.Camera import *
+# import Mach.TextureAtlas as ta
 
-import Mega.PlayerManager as pm
-import Mega.HitAndHurt as hnh
-import Mega.RenderObject as ren
-import Mega.MegaObject as mo
-from Mega.Scene import Scene
+# import Mega.PlayerManager as pm
+# import Mega.HitAndHurt as hnh
+# import Mega.RenderObject as ren
+# import Mega.MegaObject as mo
+# from Mega.Scene import Scene
 
 from PyQt5 import Qt, QtGui, QtCore
 import numpy as np
 
 import sys
 
-pixels_in_height = 100
 aspect_ratio = 16/9
 
-class Game(GlQWindow):
-    captureMouse = False
-    mouseCaptured = False
+class Game(mach.Window):
+	captureMouse = True
+	mouseCaptured = False
 
-    def start(self):
-        hnh.init()
-        ren.init()
-        mo.init()
+	def start(self):
+		self.camera = mach.OrthoScreenCamera(width, height, aspect_ratio, 0.1, 100, 1)
+		self.box_shader = mach.Shader(
+			mach.resource_path('boxvert.glsl'),
+			mach.resource_path('boxfrag.glsl')
+		)
 
+		box_vertices = [
+			1, 1, 0,
+			0, 0, 0,
+			0, 1, 0,
+			1, 1, 0,
+			1, 0, 0,
+			0, 0, 0,
+		]
 
-    def draw(self):
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+		attributes = [
+			mach.Attribute(box_vertices, 0, size=3, dtype=np.float32)
+		]
 
+		self.box = self.box_shader.createNewMachObject()
+		self.box.storeAttributeArray(attributes)
+		self.box.storeFloat('color', 1, 0, 0, 1)
+		self.box.bind()
 
-    # Called whenever the window is resized
-    def windowResized(self, width, height):
-        self.bind()
+	def draw(self):
+		self.clear()
+		self.box_shader.bind()
+		self.box.storeFloat('box', -aspect_ratio, -1, aspect_ratio, 1)
+		self.box.bind()
+		self.box.draw()
+		self.swap_buffers()
 
-    # Key handling
-    def keyPress(self, key):
-        if key == QtCore.Qt.Key_Escape:
-            self.mouseCaptured = False
-            self.setCursor(Qt.Qt.ArrowCursor)
+		# print(self.event.get())
+		self.event.get()
 
-    # Mouse events
-    def mousePressEvent(self, event):
-        x = event.x()
-        y = event.y()
+	def window_resized(self, width, height):
+		self.bind()
+		self.camera.resize(width, height)
+		self.camera.updateObjects('projectionMatrix', [self.box_shader])
+		self.draw()
 
-        # Capture the mouse
-        if self.captureMouse and not self.mouseCaptured:
-            self.setCursor(Qt.Qt.BlankCursor)
+	# Key handling
+	def key_pressed(self, key):
+		if key == QtCore.Qt.Key_Escape:
+			self.mouseCaptured = False
+			self.setCursor(Qt.Qt.ArrowCursor)
 
-            cursor = QtGui.QCursor()
-            cursor.setPos(-1, -1)
+	# Mouse events
+	def mouse_pressed(self, event):
+		x = event.x()
+		y = event.y()
 
-            geom = self.getGeometry()
-            originX = geom.width / 2
-            originY = geom.height / 2
-            cursor.setPos(geom.x + originX, geom.y + originY)
+		# Capture the mouse
+		if self.captureMouse and not self.mouseCaptured:
+			self.setCursor(Qt.Qt.BlankCursor)
 
-            self.mouseCaptured = True
+			cursor = QtGui.QCursor()
 
-    def mouseMoveEvent(self, event):
-        x = event.x()
-        y = event.y()
+			geom = self.getGeometry()
+			originX = geom.width / 2
+			originY = geom.height / 2
+			cursor.setPos(int(geom.x + originX), int(geom.y + originY))
 
-        if self.mouseCaptured:
-            geom = self.getGeometry()
+			self.mouseCaptured = True
 
-            originX = geom.width / 2
-            originY = geom.height / 2
+	def mouse_moved(self, event):
+		x = event.x()
+		y = event.y()
 
-            deltaX = x - originX
-            deltaY = y - originY
+		if self.mouseCaptured:
+			geom = self.getGeometry()
 
-            cursor = QtGui.QCursor()
-            cursor.setPos(geom.x + originX, geom.y + originY)
+			originX = geom.width / 2
+			originY = geom.height / 2
+
+			deltaX = x - originX
+			deltaY = y - originY
+
+			cursor = QtGui.QCursor()
+			cursor.setPos(int(geom.x + originX), int(geom.y + originY))
 
 if __name__ == "__main__":
-    # create the QT App and window
-    width, height = 1066, 600
-
-    app = Qt.QApplication([])
-    glQWindow = Game()
-
-    glQWindowWidget = Qt.QWidget.createWindowContainer(glQWindow, None, Qt.Qt.Widget)
-    glQWindowWidget.show()
-    glQWindowWidget.resize(width, height)
-    app.exec_()
+	# create the QT App and window
+	width = 1066
+	height = 600
+	mach.initializa_app_with_window(Game, width, height, args=())
+	print("Exiting")
