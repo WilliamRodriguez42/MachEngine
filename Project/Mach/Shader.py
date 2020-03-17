@@ -1,21 +1,13 @@
 
-from ctypes import c_int, byref, create_string_buffer, c_float
+from ctypes import c_int, byref, create_string_buffer
 from OpenGL.GL import *
 from OpenGL.GL.shaders import *
-from PIL import Image
-import numpy
-import struct
 import sys
-import glob
-
-import mach
-# from Mach.Attribute import Attribute
-# from Mach.Struct import Struct
-# from Mach.UniformBlock import UniformBlock
-# from Mach.MachObject import *
 import re
 
-class Shader:
+import mach
+
+class Shader(mach.UniformBlockStorage, mach.UniformStorage, mach.ImageStorage):
 	"""
 	Manages the creation, usage, and information of variables within a vertex shader and fragment shader
 
@@ -52,75 +44,36 @@ class Shader:
 	# vert, frag and geom take arrays of source strings
 	# the arrays will be concattenated into one string by OpenGL
 	def __init__(self, *args):
+		mach.UniformBlockStorage.__init__(self)
+		mach.UniformStorage.__init__(self)
+		mach.ImageStorage.__init__(self)
+
 		if len(args) == 2:
-			self.init2(*args)
+			self.install_shaders(args[0], args[1])
 		else:
-			self.init3(*args)
+			self.install_shaders(args[0], args[2], geom=args[1])
 
-		self.images = {}
-		self.uniforms = {}
-		self.blocks = {}
-
-	def init2(self, vert, frag):
-		" Initialization without geometry source"
-		# we are not linked yet
-		self.linked = False
-
-		self.VAO = glGenVertexArrays(1)
-		self.VBOs = []
-
-		glBindVertexArray(self.VAO)
-
-		try:
-			if glob.glob(vert): vert = open(vert, 'r').read()
-			if glob.glob(frag): frag = open(frag, 'r').read()
-
-			VERTEX_SHADER = compileShader(vert, GL_VERTEX_SHADER)
-			FRAGMENT_SHADER = compileShader(frag, GL_FRAGMENT_SHADER)
-
-			self.shader = glCreateProgram()
-			glAttachShader(self.shader, VERTEX_SHADER)
-			glAttachShader(self.shader, FRAGMENT_SHADER)
-
-			# attempt to link the program
-			self.link()
-
-			# Use this program
-			glUseProgram(self.shader)
-
-		except Exception as e:
-			decoded_string = bytes(str(e), 'utf-8').decode('unicode_escape')
-			decoded_string = bytes(str(decoded_string), 'utf-8').decode('unicode_escape')
-			print(decoded_string)
-			sys.exit(0)
-
-		# Empty uniform locations
-		self.uniformLocations = {}
-
-		self.getUniformBlocksAndStructs(vert, '', frag)
-
-	def init3(self, vert, geom, frag):
+	def install_shaders(self, vert, frag, geom=None):
 		" Initialization with geometry shader"
 		# we are not linked yet
 		self.linked = False
 
 		self.VAO = glGenVertexArrays(1)
-		self.VBOs = []
 
 		glBindVertexArray(self.VAO)
 
 		try:
-			if glob.glob(vert): vert = open(vert, 'r').read()
-			if glob.glob(geom): geom = open(geom, 'r').read()
-			if glob.glob(frag): frag = open(frag, 'r').read()
+			vert = open(vert, 'r').read()
+			if geom is not None: geom = open(geom, 'r').read()
+			frag = open(frag, 'r').read()
 
 			VERTEX_SHADER = compileShader(vert, GL_VERTEX_SHADER)
-			GEOM_SHADER = compileShader(geom, GL_GEOMETRY_SHADER)
+			if geom is not None: GEOM_SHADER = compileShader(geom, GL_GEOMETRY_SHADER)
 			FRAGMENT_SHADER = compileShader(frag, GL_FRAGMENT_SHADER)
 
 			self.shader = glCreateProgram()
 			glAttachShader(self.shader, VERTEX_SHADER)
-			glAttachShader(self.shader, GEOM_SHADER)
+			if geom is not None: glAttachShader(self.shader, GEOM_SHADER)
 			glAttachShader(self.shader, FRAGMENT_SHADER)
 
 			# attempt to link the program
@@ -129,46 +82,49 @@ class Shader:
 			# Use this program
 			glUseProgram(self.shader)
 
-		except Exception as e:
-			decoded_string = bytes(str(e), 'utf-8').decode('unicode_escape')
-			decoded_string = bytes(str(decoded_string), 'utf-8').decode('unicode_escape')
-			print(decoded_string)
-			sys.exit(0)
+		except ShaderCompilationError as e:
+			compile_failure_string = e.args[0].replace("b'", '\n')[:-1]
+			print(bytes(compile_failure_string, 'utf-8').decode('unicode_escape'), file=sys.stderr)
+			# for item in e.args[1]:
+			# 	print(item.decode('unicode_escape'))
+			print(e.args[2], file=sys.stderr)
+			sys.exit(1)
 
 		# Empty uniform locations
-		self.uniformLocations = {}
+		self.uniform_locations = {}
 
-		self.getUniformBlocksAndStructs(vert, geom, frag)
+		self.get_uniform_blocks_and_structs(vert, geom, frag)
 
-	def getUniformBlocksAndStructs(self, vert, geom, frag):
+	def get_uniform_blocks_and_structs(self, vert, geom, frag):
 		# Loop through the vertex, geometry, and fragment source and find all of the uniform blocks
-		sourceArray = (vert + geom + frag)
+		if geom is not None: source_content = vert + geom + frag
+		else: source_content = vert + frag
+		source_content_copy = str(source_content)
 
 		# Remove all of the semicolons
-		sourceArray = sourceArray.replace(';', '')
+		source_content = source_content.replace(';', '')
 
 		# Put a space before and after any opening or closing brackets
-		sourceArray = sourceArray.replace('{', ' { ').replace(' }', ' }')
+		source_content = source_content.replace('{', ' { ').replace(' }', ' }')
 
 		# Split our source string by whitespace
-		sourceArray = sourceArray.split()
+		source_content = source_content.split()
 
 		# Remove any witespace before an array bracket
-		for i in range(1, len(sourceArray)):
-			if sourceArray[i] == '[':
-				sourceArray[i-1] += '[' + sourceArray[i+1]
-				sourceArray[i] = ''
-				sourceArray[i+1] = ''
-			elif sourceArray[i] == ']':
+		for i in range(1, len(source_content)):
+			if source_content[i] == '[':
+				source_content[i-1] += '[' + source_content[i+1]
+				source_content[i] = ''
+				source_content[i+1] = ''
+			elif source_content[i] == ']':
 				j = i
-				while(sourceArray[j-1] == ''):
+				while(source_content[j-1] == ''):
 					j -= 1
 
-				sourceArray[j-1] += ']'
-				sourceArray[i] = ''
+				source_content[j-1] += ']'
+				source_content[i] = ''
 
-
-		self.dataTypeToByteCount = {
+		self.data_type_to_byte_count = {
 			"vec2" : 8,
 			"vec3" : 12,
 			"vec4" : 16,
@@ -177,9 +133,9 @@ class Shader:
 			"float": 4,
 			"int"  : 4,
 			"bool" : 4
-		}
+		} # Number of bytes for each data type
 
-		self.dataTypeToArrayByteCount = {
+		self.data_type_to_array_byte_count = {
 			"vec2" : 16,
 			"vec3" : 16,
 			"vec4" : 16,
@@ -188,166 +144,165 @@ class Shader:
 			"float": 16,
 			"int"  : 16,
 			"bool" : 16
-		}
+		} # Number of bytes for each data type when inside an array
 
-		test = (vert + geom + frag)
-		variableNameSearch = re.compile(r'(bool|float|int|vec.|ivec.|mat.|imat.)\s+(\S*?)\s*(?:\[\s*([0-9]*)\s*\])*\s*?;')
+		variable_name_search = re.compile(r'(bool|float|int|vec.|ivec.|mat.|imat.)\s+(\S*?)\s*(?:\[\s*([0-9]*)\s*\])*\s*?;')
 
-		self.glslStructs = {}
+		self.glsl_structs = {}
 
-		currentOffsetCount = 0
-		lastByteCount = 0
-		lastArrayByteCount = 0
+		current_offset_count = 0
+		last_byte_count = 0
+		last_array_byte_count = 0
 
-		structSearch = re.compile(r'struct\s+(\S+)\s*{([\s|\S]+?)}')
-		structs = structSearch.finditer(test)
+		struct_search = re.compile(r'struct\s+(\S+)\s*{([\s|\S]+?)}')
+		structs = struct_search.finditer(source_content_copy)
 		for s in structs:
-			currentStruct = s.group(1)
-			self.glslStructs[currentStruct] = {}
+			create_struct = s.group(1)
+			self.glsl_structs[create_struct] = {}
 
-			varNames = variableNameSearch.finditer(s.group(2))
+			variable_name_matches = variable_name_search.finditer(s.group(2))
 
-			for v in varNames:
-				vType = v.group(1)
-				vName = v.group(2)
+			for match in variable_name_matches:
+				variable_type = match.group(1)
+				variable_name = match.group(2)
 
-				lastByteCount = self.dataTypeToByteCount[vType]
+				last_byte_count = self.data_type_to_byte_count[variable_type]
 
-				if v.group(3):
+				if match.group(3):
 					# The variable is an array
-					num = int(v.group(3))
+					num = int(match.group(3))
 
-					arrayDataSize = self.dataTypeToArrayByteCount[vType]
-					lastByteCount = int(num * arrayDataSize)
-					lastArrayByteCount = lastByteCount
+					array_data_size = self.data_type_to_array_byte_count[variable_type]
+					last_byte_count = int(num * array_data_size)
+					last_array_byte_count = last_byte_count
 
-					self.glslStructs[currentStruct][vName] = (currentOffsetCount, lastByteCount)
-					currentOffsetCount += lastByteCount
+					self.glsl_structs[create_struct][variable_name] = (current_offset_count, last_byte_count)
+					current_offset_count += last_byte_count
 
 				else:
 					# The variable is not an array
 
 					# Map the variable to its data offset
-					lastSectorSize = currentOffsetCount % 16
+					last_sector_size = current_offset_count % 16
 
 					# If the variable can fit within one sector, find if it can fit in the last sector
-					if (lastByteCount <= 16 and lastSectorSize + lastByteCount > 16):
+					if (last_byte_count <= 16 and last_sector_size + last_byte_count > 16):
 						# We don't have enought room in this sector to fit this item, throw it into a new sector
-						currentOffsetCount += 16 - lastSectorSize
-					elif (lastByteCount > 16):
+						current_offset_count += 16 - last_sector_size
+					elif (last_byte_count > 16):
 						# The object is too big to fit in a partial sector, so fit it into the first empty sector
-						if lastSectorSize != 0:
-							currentOffsetCount += 16 - lastSectorSize
+						if last_sector_size != 0:
+							current_offset_count += 16 - last_sector_size
 
-					self.glslStructs[currentStruct][vName] = (currentOffsetCount, lastByteCount)
-					currentOffsetCount += lastByteCount
+					self.glsl_structs[create_struct][variable_name] = (current_offset_count, last_byte_count)
+					current_offset_count += last_byte_count
 
-			# Pad currentOffsetCount
-			lastSectorSize = currentOffsetCount % 16
-			if (lastSectorSize != 0):
-				currentOffsetCount += 16 - lastSectorSize
+			# Pad current_offset_count
+			last_sector_size = current_offset_count % 16
+			if (last_sector_size != 0):
+				current_offset_count += 16 - last_sector_size
 
-			self.dataTypeToByteCount[currentStruct] = currentOffsetCount
-			self.dataTypeToArrayByteCount[currentStruct] = currentOffsetCount
+			self.data_type_to_byte_count[create_struct] = current_offset_count
+			self.data_type_to_array_byte_count[create_struct] = current_offset_count
 
-			currentOffsetCount = 0
-			lastByteCount = 0
-			lastArrayByteCount = 0
+			current_offset_count = 0
+			last_byte_count = 0
+			last_array_byte_count = 0
 
-		self._uniformBlocks = {}
-		self.uniformBlockSizes = {}
-		self.uniformIndexes = {}
-		currentIndex = 0
+		self._uniform_blocks = {}
+		self.uniform_block_sizes = {}
+		self.uniform_indices = {}
+		current_index = 0
 
 		# Structs can be used within uniform blocks so we have to add them to the variable search
-		structString = ''
-		for d in self.glslStructs:
-			structString += '|' + d
-		variableNameSearch = re.compile(r'(bool|float|int|vec.|ivec.|mat.|imat.' + structString + r')\s+(\S*?)\s*(?:\[\s*([0-9]*)\s*\])*\s*?;')
+		struct_string = ''
+		for d in self.glsl_structs:
+			struct_string += '|' + d
+		variable_name_search = re.compile(r'(bool|float|int|vec.|ivec.|mat.|imat.' + struct_string + r')\s+(\S*?)\s*(?:\[\s*([0-9]*)\s*\])*\s*?;')
 
 		uniformSearch = re.compile(r'uniform\s+(\S+)\s*{([\s|\S]+?)}')
-		uniforms = uniformSearch.finditer(test)
+		uniforms = uniformSearch.finditer(source_content_copy)
 
 		for u in uniforms:
-			currentUniformBlock = u.group(1)
-			self._uniformBlocks[currentUniformBlock] = {}
-			self.uniformIndexes[currentUniformBlock] = currentIndex
-			currentIndex += 1
+			current_uniform_block = u.group(1)
+			self._uniform_blocks[current_uniform_block] = {}
+			self.uniform_indices[current_uniform_block] = current_index
+			current_index += 1
 
-			varNames = variableNameSearch.finditer(u.group(2))
+			variable_name_matches = variable_name_search.finditer(u.group(2))
 
-			for v in varNames:
-				vType = v.group(1)
-				vName = v.group(2)
+			for match in variable_name_matches:
+				variable_type = match.group(1)
+				variable_name = match.group(2)
 
-				lastByteCount = self.dataTypeToByteCount[vType]
+				last_byte_count = self.data_type_to_byte_count[variable_type]
 
-				if v.group(3):
+				if match.group(3):
 					# The variable is an array
-					num = int(v.group(3))
+					num = int(match.group(3))
 
 					# Get the number of items in the array
-					arrayDataSize = self.dataTypeToArrayByteCount[vType]
-					lastByteCount = int(num * arrayDataSize)
+					array_data_size = self.data_type_to_array_byte_count[variable_type]
+					last_byte_count = int(num * array_data_size)
 
-					self._uniformBlocks[currentUniformBlock][vName] = (currentOffsetCount, lastByteCount)
-					currentOffsetCount += lastByteCount
+					self._uniform_blocks[current_uniform_block][variable_name] = (current_offset_count, last_byte_count)
+					current_offset_count += last_byte_count
 
 				else:
 					# The variable is not an array
 
 					# Map the variable to its data offset
-					lastSectorSize = currentOffsetCount % 16
+					last_sector_size = current_offset_count % 16
 
 					# If the variable can fit within one sector, find if it can fit in the last sector
-					if (lastByteCount <= 16 and lastSectorSize + lastByteCount > 16):
+					if (last_byte_count <= 16 and last_sector_size + last_byte_count > 16):
 						# We don't have enought room in this sector to fit this item, throw it into a new sector
-						currentOffsetCount += 16 - lastSectorSize
-					elif (lastByteCount > 16):
+						current_offset_count += 16 - last_sector_size
+					elif (last_byte_count > 16):
 						# The object is too big to fit in a partial sector, so fit it into the first empty sector
-						if lastSectorSize != 0:
-							currentOffsetCount += 16 - lastSectorSize
+						if last_sector_size != 0:
+							current_offset_count += 16 - last_sector_size
 
-					self._uniformBlocks[currentUniformBlock][vName] = (currentOffsetCount, lastByteCount)
-					currentOffsetCount += lastByteCount
+					self._uniform_blocks[current_uniform_block][variable_name] = (current_offset_count, last_byte_count)
+					current_offset_count += last_byte_count
 
-			self.uniformBlockSizes[currentUniformBlock] = currentOffsetCount
-			currentOffsetCount = 0
-			lastByteCount = 0
+			self.uniform_block_sizes[current_uniform_block] = current_offset_count
+			current_offset_count = 0
+			last_byte_count = 0
 
-	def GetUniformIndex(self, name):
+	def get_uniform_index(self, name):
 		" Gets the order which this uniform block was created (0 if it was the first uniform block created, 1 if the second and so on)"
-		return self.uniformIndexes[name]
+		return self.uniform_indices[name]
 
-	def GetUniformLocation(self, name):
+	def get_uniform_location(self, name):
 		" Get the location of a uniform variable (name - the name of the uniform variable in glsl)"
-		if (name not in self.uniformLocations):
-			self.uniformLocations[name] = glGetUniformLocation(self.shader, name)
-		return self.uniformLocations[name]
+		if (name not in self.uniform_locations):
+			self.uniform_locations[name] = glGetUniformLocation(self.shader, name)
+		return self.uniform_locations[name]
 
-	def GetBlockUniformInfo(self, blockname, name):
+	def get_block_uniform_info(self, blockname, name):
 		" Get the offset and size of a variable within a uniform block (blockname - the name of the uniform block the variable is stored in, name - the name of the variable)"
-		return self._uniformBlocks[blockname][name]
+		return self._uniform_blocks[blockname][name]
 
-	def GetStructUniformInfo(self, structname, name):
+	def get_struct_uniform_info(self, structname, name):
 		" Get the offset and size of a uniform struct"
-		return self.glslStructs[structname][name]
+		return self.glsl_structs[structname][name]
 
-	def GetStructSize(self, structname):
+	def get_struct_size(self, structname):
 		" Get the size of a uniform struct (structname - the name of the struct object (not the variable name))"
-		return self.dataTypeToByteCount[structname]
+		return self.data_type_to_byte_count[structname]
 
-	def GetUniformBlockSize(self, blockname):
+	def get_uniform_block_size(self, blockname):
 		" Get the size of a uniform block (blockname - the name of the uniform block)"
-		return self.uniformBlockSizes[blockname]
+		return self.uniform_block_sizes[blockname]
 
-	def GetBlockLocation(self, blockname):
+	def get_block_location(self, blockname):
 		" Get the location of a uniform block (blockname - the name of the uniform block)"
-		if (blockname not in self.uniformLocations):
-			self.uniformLocations[blockname] = glGetUniformBlockIndex(self.shader, blockname)
-		return self.uniformLocations[blockname]
+		if (blockname not in self.uniform_locations):
+			self.uniform_locations[blockname] = glGetUniformBlockIndex(self.shader, blockname)
+		return self.uniform_locations[blockname]
 
-	def createNewMachObject(self, drawType=GL_TRIANGLES):
+	def create_new_mach_object(self, drawType=GL_TRIANGLES):
 		" A shortcut to create a new drawable object"
 		obj = mach.MachObject(self, drawType)
 		return obj
@@ -359,141 +314,9 @@ class Shader:
 		glBindVertexArray(self.VAO)
 
 		# Bind any images that
-		if not skipImages:		self.bindImages()
-		if not skipUniforms:	self.bindUniforms()
-		if not skipBlocks:		self.bindUniformBlocks()
-
-	def storeUniformBlock(self, uniformBlock):
-		"""
-		Stores a uniformBlock to be bound
-
-		Arguments:
-			uniformBlock - A UniformBlock from Mach.UniformBlock
-		"""
-
-		self.blocks[uniformBlock.name] = uniformBlock
-
-	def bindUniformBlocks(self):
-		" Binds all of the uniform buffer objects from the uniformBlocks"
-		for ub in self.blocks:
-			self.blocks[ub].autoBind()
-
-	def bindImages(self):
-		" Binds all user defined images and textures for drawing"
-		for texture_id, (name, activeTexture) in self.images.items():
-			glActiveTexture(GL_TEXTURE0 + activeTexture)
-			glBindTexture(GL_TEXTURE_2D, texture_id)
-
-	def storeTexture(self, name, tex, activeTexture=0, filter=GL_NEAREST):
-		"""
-		Store a texture (image rendered from a shader) in a sampler2D object
-
-		Arguments:
-			name - the name of the uniform variable (string)
-			tex - the Texture or DepthTexture that will be attached (Texture, DepthTexture from Mach.Rendered)
-			activeTexture - teh offset for the active texture (integer)
-			filter - what type of texture filter we want to use (GL_NEAREST for a pixely effect, good for low resolution images
-						or GL_LINEAR for blurrier, smoother look)
-		"""
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
-		glBindTexture(GL_TEXTURE_2D, tex.renderedTexture)
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter)
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter)
-
-		self.images[tex.renderedTexture] = (name, activeTexture)
-
-	def storeSampler2D(self, name, path, activeTexture=0, convert="RGBA", filter=GL_NEAREST, internalFormat=GL_RGBA, format=GL_RGBA):
-		"""
-		Store an image in a sampler2D object
-
-		Arguments:
-			name - the name of the uniform variable (string)
-			path - the path to the image (string)
-			activeTexture - the offset for the active texture (integer)
-			filter - what type of texture filter we want to use (GL_NEAREST for a pixely effect, good for low resolution images
-						or GL_LINEAR for blurrier, smoother look)
-		"""
-		im = Image.open(path, mode='r')
-
-		# Some images aren't done in RGBA so we convert it, if the user wants to save RAM or image upload times they can specify their own format or None
-		if convert: im = im.convert(convert)
-
-		width, height, image = im.size[0], im.size[1], im.tobytes()
-
-		texture_id = glGenTextures(1)
-
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
-		glBindTexture(GL_TEXTURE_2D, texture_id)
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter)
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter)
-
-		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, image)
-
-		self.images[texture_id] = (name, activeTexture)
-
-	def bindUniforms(self):
-		" Binds all of the object specific uniforms"
-		for name in self.uniforms:
-			args, func = self.uniforms[name]
-			func(*args)
-
-	def storeFloat(self, name, *vals):
-		"""
-		Store a float or a vector of floats
-
-		Arguments:
-			name - the name of the uniform variable (string)
-			vals - a set of float arguments
-		"""
-		if len(vals) > 4:
-			print("Cannot store more than four values for " + name)
-			return
-		loc = self.GetUniformLocation(name)
-		self.uniforms[name] = ((loc, *vals), floatFunctions[len(vals)])
-
-	def storeInt(self, name, *vals):
-		"""
-		Store a int or vector of ints
-
-		Arguments:
-			name - the name of the uniform variable (string)
-			vals - a set of integer arguments
-		"""
-		if len(vals) > 4:
-			print("Cannot store more than four values for " + name)
-			return
-		loc = self.GetUniformLocation(name)
-		self.uniforms[name] = ((loc, *vals), intFunctions[len(vals)])
-
-	def storeMatrix3(self, name, mat):
-		"""
-		Store a mat3
-
-		Arguments:
-			name - the name of the uniform variable (string)
-			mat - a numpy matrix
-		"""
-		value = numpy.array(mat).flatten()
-
-		loc = self.GetUniformLocation(name)
-		self.uniforms[name] = ((loc, (c_float * 9)(*value)), glUniformMatrix3fv)
-
-	def storeMatrix4(self, name, mat):
-		"""
-		Store a mat4
-
-		Arguments:
-			name - the name of the uniform variable (string)
-			mat - a numpy matrix
-		"""
-		value = numpy.array(mat).flatten()
-
-		loc = self.GetUniformLocation(name)
-		self.uniforms[name] = ((loc, 1, False, (c_float * 16)(*value)), glUniformMatrix4fv)
+		if not skipImages:		self.bind_images()
+		if not skipUniforms:	self.bind_uniforms()
+		if not skipBlocks:		self.bind_uniform_blocks()
 
 	def link(self):
 		" Attempt to link the geometry, vertex, and fragment shaders"

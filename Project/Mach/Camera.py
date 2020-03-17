@@ -24,12 +24,12 @@ class OrthoScreenCamera:
 		self.height = height
 		self.resize(width, height)
 
-	def updateObjects(self, matrix_name, objects):
+	def update_projection_matrix(self, matrix_name, objects):
 		"""
 		Takes in a list of MachObjects or Shaders and will fill out a uniform with the name matrix_name with our OrthographicMatrix
 		"""
 		for o in objects:
-			o.storeMatrix4(matrix_name, self.mat)
+			o.store_matrix4(matrix_name, self.mat)
 
 	def resize(self, width = 0, height = 0, zoom = 0):
 		"""
@@ -65,36 +65,36 @@ class Camera:
 		self.z_far = z_far
 
 		self.recalc()
-		self.perspectiveMatrix = mach.PerspectiveMatrix(FOV, aspect, z_near, z_far)
+		self.perspective_matrix = mach.PerspectiveMatrix(FOV, aspect, z_near, z_far)
 
-	def getLocalAxis(self):
+	def get_local_axis(self):
 		" Gets the local axis in global space coordinates"
 		z = Normalize(self.look)
 		x = Normalize(np.cross(z, Normalize(self.up)))
 		y = Normalize(np.cross(z, x))
 		return (x, y, z)
 
-	def getChangeOfBasis(self):
+	def get_change_of_basis(self):
 		" Gets the change of basis matrix to map global space to local space"
-		return np.matrix(self.getLocalAxis())
+		return np.matrix(self.get_local_axis())
 
-	def setPos(self, x, y, z):
+	def set_pos(self, x, y, z):
 		" Set the world position of the camera"
 		delta = self.look - self.pos
 		self.pos = np.array([x, y, z])
 
 		self.recalc()
 
-	def movePos(self, x, y, z):
+	def move_pos(self, x, y, z):
 		" Move the position of the camera"
 		delta = np.array([x, y, z])
 		self.pos += delta
 
 		self.recalc()
 
-	def movePosLocal(self, x, y, z):
+	def move_pos_local(self, x, y, z):
 		" Move the position of the camera in the local axis"
-		lx, ly, lz = self.getLocalAxis()
+		lx, ly, lz = self.get_local_axis()
 
 		mx = x * lx
 		my = y * ly
@@ -105,13 +105,13 @@ class Camera:
 
 		self.recalc()
 
-	def moveRotY(self, r):
+	def move_rot_y(self, r):
 		" Moves the camera in the global y axis by r radians"
-		rm = RotationMatrix(r, 0, 1, 0)
+		rm = mach.RotationMatrix(r, 0, 1, 0)
 		self.look = rm.dot(np.append(self.look, 1).reshape(4, 1)).T[0, :3]
 		self.recalc()
 
-	def moveRotX(self, r):
+	def move_rot_x(self, r):
 		" Moves the camera in the local x axis by r radians"
 
 		self.rx += r
@@ -120,7 +120,7 @@ class Camera:
 		elif self.rx < -self.limit:
 			self.rx = -self.limit
 
-		globalX, _, globalZ = self.getLocalAxis()
+		globalX, _, globalZ = self.get_local_axis()
 
 		rm = RotationMatrix(self.rx, *globalX)
 
@@ -129,26 +129,14 @@ class Camera:
 		self.look = rm.dot(np.append(self.look, 1).reshape(4,1)).T[0, :3]
 		self.recalc()
 
-	def lookAt(self, x, y, z):
+	def look_at(self, x, y, z):
 		" Makes the camera look at a certain point in global space"
 		self.look = Normalize(self.pos - np.array([x, y, z]))
 		self.recalc()
 
 	def recalc(self):
-		self.modelViewMatrix = LookAt(self.pos, self.pos - self.look, self.up)
+		self.model_view_matrix = LookAt(self.pos, self.pos - self.look, self.up)
 
-	def getModelViewMatrix(self):
-		" Returns the 4x4 model view matrix"
-		return self.modelViewMatrix
-
-	def getPerspectiveMatrix(self):
-		" Returns the 4x4 perspective matrix"
-		return self.perspectiveMatrix
-
-	def getOrthographicMatrix(self):
-		" Returns the 4x4 orthographic matrix"
-		return self.orthographicMatrix
-
-	def resizeAspect(self, width, height):
+	def resize_aspect(self, width, height):
 		self.aspect = width / height
-		self.perspectiveMatrix = PerspectiveMatrix(self.FOV, self.aspect, self.z_near, self.z_far)
+		self.perspective_matrix = PerspectiveMatrix(self.FOV, self.aspect, self.z_near, self.z_far)

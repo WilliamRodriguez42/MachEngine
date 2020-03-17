@@ -15,9 +15,7 @@ possibleErrors = {
 
 class Texture:
 	"""
-	Easily allows a user to render off-screen to a texture of defined size, or
-	even save or edit that texture (Without multithreading or multisampling, that you can
-	do yourself)
+	Easily allows a user to render off-screen to a texture of defined size
 
 	Arguments:
 		width - the width of the desired output image (integer)
@@ -33,14 +31,14 @@ class Texture:
 		glGenFramebuffers(1, self.buf)
 		glBindFramebuffer(GL_FRAMEBUFFER, self.buf)
 
-		self.renderedTexture = glGenTextures(1)
-		glBindTexture(GL_TEXTURE_2D, self.renderedTexture)
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, None)
+		self.rendered_texture = glGenTextures(1)
+		glBindTexture(GL_TEXTURE_2D, self.rendered_texture)
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, None)
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
 
-		glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + attachment, self.renderedTexture, 0)
+		glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + attachment, self.rendered_texture, 0)
 
 		state = glCheckFramebufferStatus(GL_FRAMEBUFFER)
 		if state != GL_FRAMEBUFFER_COMPLETE:
@@ -58,23 +56,23 @@ class Texture:
 		Arguments:
 			path - the file location of the output file (string)
 		"""
-		img = self.toImage()
+		img = self.to_image()
 		img.save(path)
 
-	def toImage(self):
-		" Converts this texture to a PIL.Image that can be modified"
+	def to_mat(self):
 		a = glReadPixels( 0, 0, self.width, self.height, GL_RGBA, GL_UNSIGNED_BYTE)
-		arr = np.array(list(a), dtype=np.uint8)
-		arr = arr.reshape(self.width, self.height, 4)
+		arr = np.frombuffer(a, dtype=np.uint8)
+		arr = arr.reshape(self.height, self.width, 4)[::-1, :, :]
+		return arr
 
-		img = Image.fromarray(arr)
+	def to_image(self):
+		" Converts this texture to a PIL.Image"
+		img = Image.fromarray(self.to_mat())
 		return img
 
 class DepthTexture:
 	"""
-	Easily allows a user to render the depth of a scene to a texture of defined size, or
-	even save or edit that texture (Without multithreading or multisampling, that you can
-	do yourself)
+	Easily allows a user to render and save the depth of a scene to a texture of defined size
 
 	Arguments:
 		width - the width of the desired output image (integer)
@@ -84,19 +82,23 @@ class DepthTexture:
 		self.width = width
 		self.height = height
 
-		self.depthrenderbuffer = glGenRenderbuffers(1)
-		glBindRenderbuffer(GL_RENDERBUFFER, self.depthrenderbuffer)
-		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height)
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, self.depthrenderbuffer)
+		# self.depthrenderbuffer = glGenRenderbuffers(1)
+		# glBindRenderbuffer(GL_RENDERBUFFER, self.depthrenderbuffer)
+		# glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height)
+		# glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, self.depthrenderbuffer)
 
-		self.renderedTexture = glGenTextures(1)
-		glBindTexture(GL_TEXTURE_2D, self.renderedTexture)
+		self.buf = GLuint(0)
+		glGenFramebuffers(1, self.buf)
+		glBindFramebuffer(GL_FRAMEBUFFER, self.buf)
+
+		self.rendered_texture = glGenTextures(1)
+		glBindTexture(GL_TEXTURE_2D, self.rendered_texture)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, self.width, self.height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, None)
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
 
-		glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, self.renderedTexture, 0)
+		glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, self.rendered_texture, 0)
 
 		state = glCheckFramebufferStatus(GL_FRAMEBUFFER)
 		if state != GL_FRAMEBUFFER_COMPLETE:
@@ -104,7 +106,7 @@ class DepthTexture:
 
 	def bind(self):
 		" Binds this texture so that it may be rendered to"
-		glBindRenderbuffer(GL_RENDERBUFFER, self.depthrenderbuffer)
+		glBindFramebuffer(GL_FRAMEBUFFER, self.buf)
 		glViewport(0, 0, self.width, self.height)
 
 	def save(self, path):
@@ -114,14 +116,16 @@ class DepthTexture:
 		Arguments:
 			path - the file location of the output file (string)
 		"""
-		img = self.toImage()
+		img = self.to_image()
 		img.save(path)
 
-	def toImage(self):
-		" Converts this texture to a PIL.Image that can be modified"
-		a = glReadPixels(0, 0, self.width, self.height, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE)
-		arr = np.array(list(a), dtype=np.uint8).repeat(3)
-		arr = arr.reshape(self.width, self.height, 3)
+	def to_mat(self):
+		a = glReadPixels( 0, 0, self.width, self.height, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE)
+		arr = np.frombuffer(a, dtype=np.uint8)
+		arr = arr.reshape(self.height, self.width)[::-1, :]
+		return arr
 
-		img = Image.fromarray(arr)
+	def to_image(self):
+		" Converts this texture to a PIL.Image that can be modified"
+		img = Image.fromarray(self.to_mat()[:, :, np.newaxis].repeat(3, axis=2))
 		return img
