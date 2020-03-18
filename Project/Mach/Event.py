@@ -4,9 +4,11 @@ from PyQt5.QtCore import Qt
 
 # Copy Qt Key_ declarations
 _qt_locals = dir(Qt)
-_qt_key_locals = [(k, Qt.__dict__[k]) for k in _qt_locals if k.startswith('Key_')]
+_starts_with_key = [k for k in _qt_locals if k.startswith('Key_')]
+master_key_dict = {}
+master_key_dict.update([(Qt.__dict__[k], False) for k in _starts_with_key])
 _globals = globals()
-_globals.update(_qt_key_locals)
+_globals.update([(k, Qt.__dict__[k]) for k in _starts_with_key])
 
 # Event types
 QUIT = 0

@@ -20,64 +20,53 @@ import glm
 from PyQt5 import Qt, QtGui, QtCore
 import numpy as np
 
-aspect_ratio = 16/9
-
 class Game(mach.Window):
 	mouse_captured = False
 
 	def start(self):
-		self.box_shader = mach.Shader(
-			mach.resource_path('boxvert.glsl'),
-			mach.resource_path('boxfrag.glsl')
-		)
+		glDisable(GL_CULL_FACE)
 
-		self.perspective = mach.PerspectiveCamera(aspect_ratio)
 		self.view = mach.ViewMatrix()
+		self.view.pos = glm.vec3(0, 0, 3)
+		self.view.target = glm.vec3(0)
+		self.view.update()
+		# self.view.set_rotation(0, np.pi / 2)
+		self.perspective = mach.PerspectiveCamera(self.size[0], self.size[1])
 
-		self.box_shader.store_matrix4('projection_matrix', self.perspective.mat)
-		self.box_shader.store_matrix4('view_matrix', self.view.mat)
+		self.ray_marching_shader = mach.Shader(
+			mach.resource_path('ray_marching/vert.glsl'),
+			mach.resource_path('ray_marching/frag.glsl')
+		)
+		self.ray_marching_shader.store_matrix4('view_matrix', self.view.mat)
+		self.ray_marching_shader.store_matrix4('perspective_matrix', glm.inverse(self.perspective.mat))
 
-		# self.box_shader.store_sampler2D_from_numpy('test', np.random.rand(100, 20, 3).astype(np.float32), format=GL_RGB)
-		box_vertices = np.array([
-			[0, 1, 0],
-			[0, 0, 0],
-			[1, 1, 0],
-			# [1, 1, 0],
-			[1, 0, 0],
-			# [0, 0, 0],
-		], dtype=np.float32)
-
-		tex_coords = np.array([
-			[0, 1],
-			[0, 0],
-			[1, 1],
-			[1, 0],
+		vertices = np.array([
+			[1, 1, 1],
+			[-1, 1, 1],
+			[-1, -1, 1],
+			[1, -1, 1]
 		], dtype=np.float32)
 
 		indices = np.array([
 			0, 1, 2,
-			1, 3, 2
+			0, 2, 3
 		], dtype=np.int32)
 
 		attributes = [
-			mach.Attribute(box_vertices, 0),
-			mach.Attribute(tex_coords, 1)
+			mach.Attribute(vertices, 0)
 		]
 
-		self.box = self.box_shader.create_new_mach_object()
-		self.box.store_attribute_array(attributes)
-		self.box.store_element_index_array(indices)
-		self.box.store_float('color', (1, 0, 0, 1))
-		self.box.store_float('box', (-aspect_ratio, -1, aspect_ratio, 1))
-		self.box_shader.store_sampler2D_from_path('test', mach.resource_path('guy.png'))
+		self.quad = self.ray_marching_shader.create_new_mach_object()
+		self.quad.store_attribute_array(attributes)
+		self.quad.store_element_index_array(indices)
 
 	def draw(self, delta_time):
 		self.clear()
 
-		# self.texture.bind()
-		self.box_shader.bind()
-		self.box.bind()
-		self.box.draw()
+		self.bind()
+		self.ray_marching_shader.bind()
+		self.quad.bind()
+		self.quad.draw()
 		self.swap_buffers()
 
 		move = glm.vec3(0)
@@ -92,7 +81,7 @@ class Game(mach.Window):
 		if move != glm.vec3(0):
 			self.view.move_rel_no_y(glm.normalize(move) * 0.1)
 			self.view.update()
-			self.box_shader.store_matrix4('view_matrix', self.view.mat)
+			self.ray_marching_shader.store_matrix4('view_matrix', self.view.mat)
 
 		for event in self.event.get():
 			if event.type == mach.QUIT:
@@ -100,7 +89,7 @@ class Game(mach.Window):
 				self.close()
 			# elif event.type == mach.VIDEOEXPOSE:
 				# self.camera.resize(self.size[0], self.size[1])
-				# self.camera.update_projection_matrix('projection_matrix', [self.box_shader])
+				# self.camera.update_projection_matrix('projection_matrix', [self.ray_marching_shader])
 			elif event.type == mach.KEYDOWN:
 				if event.key == mach.Key_Escape:
 					self.mouse_captured = False
@@ -108,7 +97,7 @@ class Game(mach.Window):
 			elif event.type == mach.MOUSEBUTTONDOWN:
 				if not self.mouse_captured:
 					self.setCursor(Qt.Qt.BlankCursor)
-					center = self.size // 2 + self.pos
+					center = self.size // 2
 					self.set_mouse_pos(center)
 					self.mouse_captured = True
 
@@ -119,17 +108,18 @@ class Game(mach.Window):
 			self.set_mouse_pos(center)
 
 			yaw, pitch = mouse_delta * 0.001
-			self.view.rotate_pitch_yaw_rel(-pitch, yaw)
+			self.view.rotate(pitch, yaw)
 			self.view.update()
-			self.box_shader.store_matrix4('view_matrix', self.view.mat)
+			self.ray_marching_shader.store_matrix4('view_matrix', self.view.mat)
 
-	def on_expose(self, event):
-		self.perspective.resize(self.size[0], self.size[1])
-		self.box_shader.store_matrix4('projection_matrix', self.perspective.mat)
-
+	# def on_expose(self, event):
+	# 	self.perspective.resize(self.size[0], self.size[1])
+	# 	self.ray_marching_shader.store_matrix4('projection_matrix', self.perspective.mat)
 
 if __name__ == "__main__":
 	# create the QT App and window
-	width = 1066
+	aspect_ratio = 1
+
 	height = 600
+	width = int(aspect_ratio * height)
 	mach.run_app_with_window(Game, width, height)

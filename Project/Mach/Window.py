@@ -67,6 +67,7 @@ class Window(QWindow):
 
 		# OpenGL settings
 		glEnable(GL_DEPTH_TEST)
+		glEnable(GL_CULL_FACE)
 		glDepthMask(GL_TRUE)
 		glDepthFunc(GL_LEQUAL)
 
@@ -74,7 +75,7 @@ class Window(QWindow):
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
 		# A list of keys that are currently being pressed
-		self.keys_held_down = []
+		self.keys_pressed = dict(mach.master_key_dict)
 
 		# A list of mouse buttons that are currently being pressed
 		self.mouse_buttons_held_down = np.zeros(17, dtype=np.bool)
@@ -97,17 +98,14 @@ class Window(QWindow):
 		self.frame_times = [0] * 10 # Store the last 10 frame time deltas
 		# print([d for d in dir(self) if d.endswith('Event')]) # Print all possible event handlers
 
-		# Default mouse position
-		self.cursor = QtGui.QCursor()
-		self.mouse_pos = np.zeros(2, dtype=np.int) # Cannot initialize mouse position until object is attached to parent
-
 		# Keep track of where the close event comes from
 		self.close_user_requested = False
 
-	def start(self):
-		return
+		# Create mouse object
+		self.cursor = QtGui.QCursor()
 
-	def draw(self):
+
+	def start(self):
 		return
 
 	def set_FPS(self, FPS):
@@ -138,14 +136,15 @@ class Window(QWindow):
 
 	# Update the screen
 	def update(self):
-		# self.make_current()
-		# print(self.isClosing())
-		self.draw()
-
 		# Store information to calculate FPS
-		current_time = self.timer.elapsed()
-		self.frame_times.append(current_time / 1000)
+		delta_time = self.timer.elapsed()
+		self.frame_times.append(delta_time / 1000)
 		del self.frame_times[0]
+
+		self.draw(delta_time)
+
+	def draw(self, delta_time):
+		return
 
 	# Gets the average of the recorded FPS for the last ten frames
 	def get_FPS(self):
@@ -163,10 +162,10 @@ class Window(QWindow):
 			event,
 			pos = self.pos
 		))
-		self.on_window_move(event)
+		self.on_move(event)
 
 	# Called when the window is moved, for ther user to override
-	def on_window_move(self, event):
+	def on_move(self, event):
 		pass
 
 	# Handle video expose / resize events
@@ -179,9 +178,11 @@ class Window(QWindow):
 		self.bind()
 
 		if self.isExposed() and self.isVisible():
-			if not self.exposed.is_set():
+			if not self.exposed.is_set(): # First call to expose event
 				self.exposed.set()
 				self.start()
+
+				self.mouse_pos = self.size // 2
 
 				# Start the update thread
 				self.update_timer.timeout.connect(self.update)
@@ -194,11 +195,11 @@ class Window(QWindow):
 		))
 
 		if self.update_timer.isActive():
-			self.on_window_expose(event)
+			self.on_expose(event)
 			self.update_timer.start()
 
 	# Called once the mouse is resized, for the user to override
-	def on_window_expose(self, event):
+	def on_expose(self, event):
 		return
 
 	def resizeEvent(self, event):
@@ -213,9 +214,9 @@ class Window(QWindow):
 			size = self.size
 		))
 		if self.update_timer.isActive():
-			self.on_window_resize(event)
+			self.on_resize(event)
 
-	def on_window_resize(self, event):
+	def on_resize(self, event):
 		return
 
 	# Automate window close events for pygame style event handling
@@ -242,14 +243,13 @@ class Window(QWindow):
 		event.accept() # Accept the event by default, it is okay to call ignore later
 		if not event.isAutoRepeat():
 			key = event.key()
-			if not key in self.keys_held_down: # Sometimes windows likes to add in multiple keys anyway
-				self.keys_held_down.append(key)
-				self.event.queue_event(mach.Event(
-					mach.KEYDOWN,
-					event,
-					key = key
-				))
-				self.on_key_press(key)
+			self.keys_pressed[key] = True
+			self.event.queue_event(mach.Event(
+				mach.KEYDOWN,
+				event,
+				key = key
+			))
+			self.on_key_press(key)
 
 	# Called once every time a key is pressed, for the user to override
 	def on_key_press(self, key):
@@ -260,7 +260,7 @@ class Window(QWindow):
 		event.accept() # Accept the event by default, it is okay to call ignore later
 		if not event.isAutoRepeat():
 			key = event.key()
-			self.keys_held_down.remove(key)
+			self.keys_pressed[key] = False
 			self.event.queue_event(mach.Event(
 				mach.KEYUP,
 				event,
@@ -339,9 +339,9 @@ class Window(QWindow):
 			angle_delta = event.angleDelta(),
 			pixel_delta = event.pixelDelta()
 		))
-		self.on_mouse_wheel(event)
+		self.on_wheel(event)
 
-	def on_mouse_wheel(self, event):
+	def on_wheel(self, event):
 		return
 
 	def focusInEvent(self, event):

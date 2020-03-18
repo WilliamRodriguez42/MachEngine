@@ -12,6 +12,7 @@ numpy = "*"
 pyqt5 = "*"
 lxml = "*"
 pygame = "*"
+pyglm = "*"
 
 [requires]
 python_version = "3.8"

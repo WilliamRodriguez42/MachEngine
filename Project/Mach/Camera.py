@@ -1,25 +1,30 @@
 # from Mach.Matrix import *
 import mach
 import numpy as np
+import glm
+import math
 
-class OrthoScreenCamera:
-	def __init__(self, width, height, aspect, near_clip, far_clip, zoom = 1):
+# Define the up vector in world coordinates
+UP = glm.vec3(0, 1, 0)
+
+class OrthographicCamera:
+	def __init__(self, width, height, aspect_ratio, near_clip, far_clip, zoom = 1):
 		"""
 		Creates an orthographic matrix used for rendering to the screen
 		Takes in the width and height of the screen in pixels
-		as well as the desired aspect ratio in width / heigth
+		as well as the desired aspect_ratio ratio in width / heigth
 		the near_clip and far_clip express the desired clipping ranges of the matrix
 		and the zoom allows the user to multiply the upper and lower ranges of the x and y axis by a scalar
 
 		the +y is limited to zoom
 		the -y is limited to -zoom
-		the +x is limited to zoom * aspect
-		the -x is limited to -zoom * aspect
+		the +x is limited to zoom * aspect_ratio
+		the -x is limited to -zoom * aspect_ratio
 		"""
 		self.near_clip = near_clip
 		self.far_clip = far_clip
 		self.zoom = zoom
-		self.aspect = aspect
+		self.aspect_ratio = aspect_ratio
 		self.width = width
 		self.height = height
 		self.resize(width, height)
@@ -39,104 +44,85 @@ class OrthoScreenCamera:
 		if height > 0: self.height = height
 		if zoom > 0: self.zoom = zoom
 
-		if width > self.aspect * height:
-			aspect = 1 / (height * self.zoom)
+		if width > self.aspect_ratio * height:
+			aspect_ratio = 1 / (height * self.zoom)
 		else:
-			aspect = self.aspect / (width * self.zoom)
-		self.mat = mach.OrthographicMatrix(-width * aspect, width * aspect, -height * aspect, height * aspect, self.near_clip, self.far_clip)
+			aspect_ratio = self.aspect_ratio / (width * self.zoom)
+		self.mat = mach.OrthographicMatrix(-width * aspect_ratio, width * aspect_ratio, -height * aspect_ratio, height * aspect_ratio, self.near_clip, self.far_clip)
 
-class Camera:
-	"""
-	X axis is to the right of the screen
-	Y axis is to the top of the screen
-	Z axis is out of the screen
-	"""
-
-	limit = np.pi / 2.1
-	def __init__(self, aspect, FOV=60, z_near=0.1, z_far=100):
-		self.look = np.array([0., 0, -1])
-		self.pos = np.array([0., 0, -10])
-		self.up = np.array([0., 1, 0])
-
-		self.rx = 0 # Local rotation in x axis, must be clamped between -pi / 4 to pi / 4
-
-		self.FOV = FOV
+class PerspectiveCamera:
+	def __init__(self, width, height, FOV=60, z_near=0.1, z_far=100):
+		self.FOV = math.radians(FOV)
 		self.z_near = z_near
 		self.z_far = z_far
+		self.aspect_ratio = width / height
+		self.update()
 
-		self.recalc()
-		self.perspective_matrix = mach.PerspectiveMatrix(FOV, aspect, z_near, z_far)
+	def resize(self, width, height):
+		self.aspect_ratio = width / height
+		self.update()
 
-	def get_local_axis(self):
-		" Gets the local axis in global space coordinates"
-		z = Normalize(self.look)
-		x = Normalize(np.cross(z, Normalize(self.up)))
-		y = Normalize(np.cross(z, x))
-		return (x, y, z)
+	def update(self):
+		self.mat = glm.perspective(self.FOV, self.aspect_ratio, self.z_near, self.z_far)
 
-	def get_change_of_basis(self):
-		" Gets the change of basis matrix to map global space to local space"
-		return np.matrix(self.get_local_axis())
+class ViewMatrix:
+	def __init__(self):
+		self.pos = glm.vec3(0, 0, 3)
+		self.target = glm.vec3(0, 0, 0)
+		self.mat = glm.lookAt(self.pos, self.target, UP)
+		self.polar = glm.polar(self.target - self.pos)
 
-	def set_pos(self, x, y, z):
-		" Set the world position of the camera"
-		delta = self.look - self.pos
-		self.pos = np.array([x, y, z])
+		self.pitch_max = math.radians(89)
+		self.pitch_min = math.radians(-89)
 
-		self.recalc()
-
-	def move_pos(self, x, y, z):
-		" Move the position of the camera"
-		delta = np.array([x, y, z])
+	def move_rel(self, delta, locked=False):
+		"""
+		Translate by delta relative to the current position
+			delta - glm.vec3 change in position
+			locked - (boolean) should the camera stay fixed on the target
+		"""
+		delta = glm.vec3(glm.vec4(*delta, 1) * self.mat)
 		self.pos += delta
+		if not locked: self.target += delta
 
-		self.recalc()
+	def move_rel_no_y(self, delta, locked=False):
+		"""
+		Translate by delta relative to the current position, removing any component in the y direction
+			delta - glm.vec3 change in position
+			locked - (boolean) should the camera stay fixed on the target
+		"""
+		forward = self.target - self.pos
+		forward.y = 0
+		forward = glm.normalize(forward)
+		right = glm.cross(forward, UP)
 
-	def move_pos_local(self, x, y, z):
-		" Move the position of the camera in the local axis"
-		lx, ly, lz = self.get_local_axis()
+		local_delta = glm.vec3(0)
+		local_delta.x = glm.dot(right, delta)
+		local_delta.z = glm.dot(forward, delta)
+		self.pos += local_delta
+		if not locked: self.target += local_delta
 
-		mx = x * lx
-		my = y * ly
-		mz = z * lz
-
-		delta = mx + my + mz
+	def move(self, delta, locked=False):
 		self.pos += delta
+		if not locked: self.target += delta
 
-		self.recalc()
+	def set_position(self, pos, locked=False):
+		if locked:
+			self.pos = pos
+		else:
+			delta = self.target - self.pos
+			self.pos = pos
+			self.target = delta + pos
 
-	def move_rot_y(self, r):
-		" Moves the camera in the global y axis by r radians"
-		rm = mach.RotationMatrix(r, 0, 1, 0)
-		self.look = rm.dot(np.append(self.look, 1).reshape(4, 1)).T[0, :3]
-		self.recalc()
+	def rotate(self, pitch, yaw):
+		self.polar[0] = max(min(self.polar[0] - pitch, self.pitch_max), self.pitch_min)
+		self.polar[1] -= yaw
+		self.target = glm.euclidean(self.polar.xy) + self.pos
 
-	def move_rot_x(self, r):
-		" Moves the camera in the local x axis by r radians"
+	def set_rotation(self, pitch, yaw):
+		self.polar[0] = max(min(-pitch, self.pitch_max), self.pitch_min)
+		self.polar[1] = -yaw
+		self.target = glm.euclidean(self.polar.xy) + self.pos
 
-		self.rx += r
-		if self.rx > self.limit:
-			self.rx = self.limit
-		elif self.rx < -self.limit:
-			self.rx = -self.limit
-
-		globalX, _, globalZ = self.get_local_axis()
-
-		rm = RotationMatrix(self.rx, *globalX)
-
-		self.look[1] = 0
-		self.look = Normalize(self.look)
-		self.look = rm.dot(np.append(self.look, 1).reshape(4,1)).T[0, :3]
-		self.recalc()
-
-	def look_at(self, x, y, z):
-		" Makes the camera look at a certain point in global space"
-		self.look = Normalize(self.pos - np.array([x, y, z]))
-		self.recalc()
-
-	def recalc(self):
-		self.model_view_matrix = LookAt(self.pos, self.pos - self.look, self.up)
-
-	def resize_aspect(self, width, height):
-		self.aspect = width / height
-		self.perspective_matrix = PerspectiveMatrix(self.FOV, self.aspect, self.z_near, self.z_far)
+	def update(self):
+		self.mat = glm.lookAt(self.pos, self.target, UP)
