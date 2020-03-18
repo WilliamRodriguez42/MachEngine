@@ -20,8 +20,6 @@ import glm
 from PyQt5 import Qt, QtGui, QtCore
 import numpy as np
 
-aspect_ratio = 16/9
-
 class Game(mach.Window):
 	mouse_captured = False
 
@@ -31,7 +29,7 @@ class Game(mach.Window):
 			mach.resource_path('boxfrag.glsl')
 		)
 
-		self.perspective = mach.PerspectiveCamera(aspect_ratio)
+		self.perspective = mach.PerspectiveCamera(self.size[0], self.size[1])
 		self.view = mach.ViewMatrix()
 
 		self.box_shader.store_matrix4('projection_matrix', self.perspective.mat)
@@ -108,7 +106,7 @@ class Game(mach.Window):
 			elif event.type == mach.MOUSEBUTTONDOWN:
 				if not self.mouse_captured:
 					self.setCursor(Qt.Qt.BlankCursor)
-					center = self.size // 2 + self.pos
+					center = self.size // 2
 					self.set_mouse_pos(center)
 					self.mouse_captured = True
 
@@ -119,7 +117,7 @@ class Game(mach.Window):
 			self.set_mouse_pos(center)
 
 			yaw, pitch = mouse_delta * 0.001
-			self.view.rotate_pitch_yaw_rel(-pitch, yaw)
+			self.view.rotate(pitch, yaw)
 			self.view.update()
 			self.box_shader.store_matrix4('view_matrix', self.view.mat)
 
@@ -130,6 +128,7 @@ class Game(mach.Window):
 
 if __name__ == "__main__":
 	# create the QT App and window
-	width = 1066
+	aspect_ratio = 16/9
 	height = 600
+	width = int(aspect_ratio * height)
 	mach.run_app_with_window(Game, width, height)
