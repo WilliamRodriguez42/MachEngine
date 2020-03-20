@@ -27,24 +27,27 @@ class Game(mach.Window):
 		glDisable(GL_CULL_FACE)
 
 		self.view = mach.ViewMatrix()
-		self.view.pos = glm.vec3(0, 0, 3)
+		self.view.pos = glm.vec3(0, 0, 50)
 		self.view.target = glm.vec3(0)
 		self.view.update()
 		# self.view.set_rotation(0, np.pi / 2)
 		self.perspective = mach.PerspectiveCamera(self.size[0], self.size[1])
 
+		self.scale = 0
+
 		self.ray_marching_shader = mach.Shader(
 			mach.resource_path('ray_marching/vert.glsl'),
 			mach.resource_path('ray_marching/frag.glsl')
 		)
-		self.ray_marching_shader.store_matrix4('view_matrix', self.view.mat)
+		self.ray_marching_shader.store_matrix4('view_matrix', glm.inverse(self.view.mat))
 		self.ray_marching_shader.store_matrix4('perspective_matrix', glm.inverse(self.perspective.mat))
+		self.ray_marching_shader.store_float('scale', self.scale)
 
 		vertices = np.array([
-			[1, 1, 1],
-			[-1, 1, 1],
-			[-1, -1, 1],
-			[1, -1, 1]
+			[1, 1, -1],
+			[-1, 1, -1],
+			[-1, -1, -1],
+			[1, -1, -1]
 		], dtype=np.float32)
 
 		indices = np.array([
@@ -59,15 +62,17 @@ class Game(mach.Window):
 		self.quad = self.ray_marching_shader.create_new_mach_object()
 		self.quad.store_attribute_array(attributes)
 		self.quad.store_element_index_array(indices)
+		self.quad.bind()
 
 	def draw(self, delta_time):
 		self.clear()
 
 		self.bind()
 		self.ray_marching_shader.bind()
-		self.quad.bind()
 		self.quad.draw()
 		self.swap_buffers()
+
+		print(self.get_FPS())
 
 		move = glm.vec3(0)
 		if self.keys_pressed[mach.Key_Left] or self.keys_pressed[mach.Key_A]:
@@ -75,13 +80,17 @@ class Game(mach.Window):
 		if self.keys_pressed[mach.Key_Right] or self.keys_pressed[mach.Key_D]:
 			move += glm.vec3(1, 0, 0)
 		if self.keys_pressed[mach.Key_Up] or self.keys_pressed[mach.Key_W]:
-			move += glm.vec3(0, 0, 1)
-		if self.keys_pressed[mach.Key_Down] or self.keys_pressed[mach.Key_S]:
 			move += glm.vec3(0, 0, -1)
+		if self.keys_pressed[mach.Key_Down] or self.keys_pressed[mach.Key_S]:
+			move += glm.vec3(0, 0, 1)
 		if move != glm.vec3(0):
-			self.view.move_rel_no_y(glm.normalize(move) * 0.1)
+			self.view.move_rel(glm.normalize(move) * 0.1)
 			self.view.update()
-			self.ray_marching_shader.store_matrix4('view_matrix', self.view.mat)
+			self.ray_marching_shader.store_matrix4('view_matrix', glm.inverse(self.view.mat))
+
+		if self.keys_pressed[mach.Key_Space]:
+			self.scale += 0.003
+			self.ray_marching_shader.store_float('scale', self.scale)
 
 		for event in self.event.get():
 			if event.type == mach.QUIT:
@@ -110,11 +119,11 @@ class Game(mach.Window):
 			yaw, pitch = mouse_delta * 0.001
 			self.view.rotate(pitch, yaw)
 			self.view.update()
-			self.ray_marching_shader.store_matrix4('view_matrix', self.view.mat)
+			self.ray_marching_shader.store_matrix4('view_matrix', glm.inverse(self.view.mat))
 
-	# def on_expose(self, event):
-	# 	self.perspective.resize(self.size[0], self.size[1])
-	# 	self.ray_marching_shader.store_matrix4('projection_matrix', self.perspective.mat)
+	def on_expose(self, event):
+		self.perspective.resize(self.size[0], self.size[1])
+		self.ray_marching_shader.store_matrix4('perspective_matrix', glm.inverse(self.perspective.mat))
 
 if __name__ == "__main__":
 	# create the QT App and window

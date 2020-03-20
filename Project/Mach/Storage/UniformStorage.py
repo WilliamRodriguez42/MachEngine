@@ -1,6 +1,7 @@
 from OpenGL.GL import *
 import numpy as np
 from ctypes import c_float
+from collections.abc import Iterable
 
 float_functions = {
 	1: glUniform1f,
@@ -34,6 +35,11 @@ class UniformStorage:
 			name - the name of the uniform variable (string)
 			vals - a set of float arguments
 		"""
+		if not isinstance(vals, Iterable):
+			loc = self.get_uniform_location(name)
+			self.uniforms[name] = ((loc, vals), float_functions[1])
+			return
+
 		if len(vals) > 4:
 			print("Cannot store more than four values for " + name)
 			return
