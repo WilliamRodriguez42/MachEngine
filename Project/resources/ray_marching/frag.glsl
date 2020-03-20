@@ -38,7 +38,7 @@ float many_small_spheres_SDF(vec3 p) {
 	return length(p) - 0.05;
 }
 
-const float scale = 3.2;
+uniform float scale = 3.2;
 int iterations = 10;
 const float fixed_radius_2 = 100;
 const float min_radius_2 = 0.1;
@@ -78,13 +78,15 @@ float DE(vec3 z)
 	return r/abs(dr);
 }
 
-float scene_SDF(vec3 p) {
-	return DE(p);
-	// return many_small_spheres_SDF(p);
-	// vec3 sphere_pos1 = (view_matrix * vec4(0, 0, 0, 1)).xyz;
-	// vec3 sphere_pos2 = (view_matrix * vec4(1, 0, 0, 1)).xyz;
+uniform vec3 ball_position;
 
-	// return union_SDF(sphere_SDF(sphere_pos1, p), sphere_SDF(sphere_pos2, p));
+float sphere_distance;
+float fractal_distance;
+
+float scene_SDF(vec3 p) {
+	fractal_distance = DE(p);
+	sphere_distance = sphere_SDF(ball_position, p);
+	return union_SDF(fractal_distance, sphere_distance);
 }
 
 float get_distance(vec3 camera_pos, vec3 view_ray, out int num_iterations) {
@@ -141,29 +143,59 @@ void main() {
 	view_ray = normalize(view_ray);
 	vec3 camera_pos = vec3(view_matrix * vec4(0, 0, 0, 1));
 
+	vec3 light_pos = vec3(0, 2, 50);
+
 	int num_iterations;
 	float dist = get_distance(camera_pos, view_ray, num_iterations);
+	float dist_copy = dist;
+
+	float fractal_distance_copy, sphere_distance_copy;
+	vec3 sphere_frag_pos;
 
 	f_color = vec4(0, 0, 0, 1);
 	if (dist < MAX_MARCHING_DIST) {
-		vec3 light_pos = camera_pos + vec3(0, 2, 0);
 
 		vec3 frag_pos = camera_pos + dist * view_ray;
+		sphere_frag_pos = frag_pos;
 
 		vec3 light_dir = normalize(light_pos - frag_pos);
 
+		// Did we hit the sphere
+		fractal_distance_copy = fractal_distance;
+		sphere_distance_copy = sphere_distance;
+
 		f_color = vec4(1, 0, 0, 1);
-		float AO_factor = float(num_iterations) / MAX_MARCHING_STEPS;
-		f_color = mix(f_color, vec4(0.3, 0, 0, 1), pow(AO_factor, 0.2));
+
+		if (fractal_distance > sphere_distance) {
+			// Reflection
+			vec3 reflection_normal = normalize(frag_pos - ball_position);
+			vec3 reflection_dir = reflect(view_ray, reflection_normal);
+			int reflection_num_iterations;
+			dist = get_distance(camera_pos, reflection_dir, reflection_num_iterations);
+			vec3 frag_pos = frag_pos + dist * reflection_dir;
+
+			float AO_factor = float(reflection_num_iterations) / MAX_MARCHING_STEPS;
+			f_color = mix(f_color, vec4(0.3, 0, 0, 1), pow(AO_factor, 0.2));
+		}
 
 		// Soft shadows
 		int light_num_iterations;
 		float max_dist_to_light = length(light_pos - frag_pos);
 		float light_dist = get_shadow(frag_pos, light_dir, max_dist_to_light);
-		// if (light_dist < max_dist_to_light) penumbra = 0.5;
 		f_color = mix(vec4(0, 0, 0, 1), f_color, light_dist);
+
+		float AO_factor = float(num_iterations) / MAX_MARCHING_STEPS;
+		f_color = mix(f_color, vec4(0.3, 0, 0, 1), pow(AO_factor, 0.2));
+
 	}
 	vec4 fog_color = vec4(1);
 	f_color = mix(f_color, fog_color, pow(dist / MAX_MARCHING_DIST, 1.5));
 
+	// Apply fog and shading to sphere
+	if (dist_copy < MAX_MARCHING_DIST && fractal_distance_copy > sphere_distance_copy) {
+		vec3 delta = ball_position - sphere_frag_pos;
+		float factor = dot(delta, view_ray);
+		f_color = mix(vec4(0.15, 0.15, 0.15, 1), f_color, factor);
+		f_color = mix(f_color, fog_color, pow(dist_copy / MAX_MARCHING_DIST, 1.5));
+	}
 }

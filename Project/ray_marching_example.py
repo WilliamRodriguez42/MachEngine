@@ -42,6 +42,7 @@ class Game(mach.Window):
 		self.ray_marching_shader.store_matrix4('view_matrix', glm.inverse(self.view.mat))
 		self.ray_marching_shader.store_matrix4('perspective_matrix', glm.inverse(self.perspective.mat))
 		self.ray_marching_shader.store_float('scale', self.scale)
+		self.ray_marching_shader.store_float('ball_position', glm.vec3(0, 0, 48))
 
 		vertices = np.array([
 			[1, 1, -1],
@@ -63,6 +64,8 @@ class Game(mach.Window):
 		self.quad.store_attribute_array(attributes)
 		self.quad.store_element_index_array(indices)
 		self.quad.bind()
+
+		self.set_FPS(60)
 
 	def draw(self, delta_time):
 		self.clear()
